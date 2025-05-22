@@ -103,6 +103,10 @@ func StartExecutionAutomation(isAuto bool, taskRepo *domaintaskcenter.Repository
 			return
 		}
 		for _, task := range taskRepos {
+			if !task.IsTaskEnabled {
+				continue
+			}
+			fmt.Println("Task Name:", task)
 			// 创建一个新的 TaskExecution 实例
 			te := &TaskExecution{
 				Name:     task.TaskName,
@@ -122,11 +126,15 @@ func StartExecutionAutomation(isAuto bool, taskRepo *domaintaskcenter.Repository
 				},
 			}
 			// 添加任务到调度器
-			_, err := AddTask(te)
+			id, err := AddTask(te)
+			fmt.Println("Task ID:", id)
 			if err != nil {
 				fmt.Println("Failed to add task:", err)
+			} else {
+				fmt.Println("Task added with ID:", id)
 			}
 		}
+
 		StartScheduler()	
 	} else {
 		fmt.Println("Automation is disabled.")

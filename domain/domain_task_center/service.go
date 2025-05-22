@@ -26,6 +26,7 @@ func (s *Service) CreateTask(req *httpTypes.RequestTaskCenter) error {
 		TaskBody:   req.TaskBody,
 		TaskCron:   req.TaskCron,
 		TaskRemark: req.TaskRemark,
+		IsTaskEnabled: req.IsTaskEnabled,
 	}
 	return s.r.CreateTask(task)
 }

@@ -1,4 +1,4 @@
-# HttpScheduleBE - 测试阶段
+# HttpScheduleBE
 
 HttpScheduleBE 是一个基于 Go 语言开发的 HTTP 定时任务调度后端服务。它支持通过 Web API 管理定时任务，并自动调度执行 HTTP 请求，记录执行结果。
 
@@ -9,15 +9,6 @@ HttpScheduleBE 是一个基于 Go 语言开发的 HTTP 定时任务调度后端�
 - HTTP 请求执行：支持自定义请求方法、Header、Body
 - 执行记录：记录每次任务执行的状态、时间和错误日志
 - 配置化：通过 `etc/config.yaml` 配置数据库和自动执行参数
-
-## 项目结构
-
-- `/api`：Gin 路由、控制器、类型定义、响应封装
-- `/cmd`：应用启动命令
-- `/config`：配置文件加载
-- `/domain`：领域模型、服务、仓储
-- `/utils/database`：数据库连接与管理
-- `/etc/config.yaml`：配置文件
 
 ## 快速开始
 

@@ -1,7 +1,7 @@
-package domainexecutioncenter
+package repo
 
 import (
-	"HttpScheduleBE/domain/entity"
+	"HttpScheduleBE/entity"
 
 	"gorm.io/gorm"
 )
@@ -20,7 +20,7 @@ func (r *Repository) Migration() error {
 
 func (r *Repository) GetExecutions() (*[]entity.ExecutionCenter, error) {
 	var execution []entity.ExecutionCenter
-	err := r.db.Find(&execution).Error
+	err := r.db.Order("created_at desc").Find(&execution).Error
 	if err != nil {
 		return nil, err
 	}
@@ -28,7 +28,7 @@ func (r *Repository) GetExecutions() (*[]entity.ExecutionCenter, error) {
 }
 
 func (r *Repository) CreateExecution(execution *entity.ExecutionCenter) error {
-    return r.db.Create(execution).Error
+	return r.db.Create(execution).Error
 }
 
 // func (r *Repository) CreateExecution(execution *TaskExecution) error {

@@ -1,20 +1,20 @@
-package apitaskcenter
+package handler
 
 import (
 	"HttpScheduleBE/api/helper"
 	"HttpScheduleBE/config"
-	domainTaskCenter "HttpScheduleBE/domain/domain_task_center"
-	typesTaskCenter "HttpScheduleBE/api/types"
+	"HttpScheduleBE/services/task/service"
+	"HttpScheduleBE/services/task/types"
 
 	"github.com/gin-gonic/gin"
 )
 
 type Controller struct {
-	projectService *domainTaskCenter.Service
+	projectService *service.Service
 	appConfig      *config.Config
 }
 
-func NewTaskCenterController(projectService *domainTaskCenter.Service, appConfig *config.Config) *Controller {
+func NewTaskCenterController(projectService *service.Service, appConfig *config.Config) *Controller {
 	return &Controller{
 		projectService: projectService,
 		appConfig:      appConfig,
@@ -22,7 +22,7 @@ func NewTaskCenterController(projectService *domainTaskCenter.Service, appConfig
 }
 
 func (c *Controller) CreateTask(g *gin.Context) {
-	var req typesTaskCenter.RequestTaskCenter
+	var req types.RequestTaskCenter
 	if err := g.ShouldBindJSON(&req); err != nil {
 		helper.RespondWithError(g, 400, err.Error())
 		return
@@ -41,7 +41,7 @@ func (c *Controller) UpdateTask(g *gin.Context) {
 		helper.RespondWithError(g, 400, "Task ID is required")
 		return
 	}
-	var req typesTaskCenter.RequestTaskCenter
+	var req types.RequestTaskCenter
 	if err := g.ShouldBindJSON(&req); err != nil {
 		helper.RespondWithError(g, 400, err.Error())
 		return

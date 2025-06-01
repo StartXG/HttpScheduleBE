@@ -2,14 +2,14 @@ package database
 
 import (
 	"HttpScheduleBE/config"
-	domainExecutionCenter "HttpScheduleBE/domain/domain_execution_center"
-	domainTaskCenter "HttpScheduleBE/domain/domain_task_center"
+	ExecutionRepo "HttpScheduleBE/services/execution/repo"
+	TaskRepo "HttpScheduleBE/services/task/repo"
 	"fmt"
 )
 
 type Databases struct {
-	TaskCenterRepository      *domainTaskCenter.Repository
-	ExecutionCenterRepository *domainExecutionCenter.Repository
+	TaskCenterRepository      *TaskRepo.Repository
+	ExecutionCenterRepository *ExecutionRepo.Repository
 }
 
 var AppConfig = &config.Config{}
@@ -23,7 +23,7 @@ func CreateDBs(cfg *config.Config) *Databases {
 	}
 
 	return &Databases{
-		TaskCenterRepository:      domainTaskCenter.NewTaskCenterRepository(db),
-		ExecutionCenterRepository: domainExecutionCenter.NewExecutionCenterRepository(db),
+		TaskCenterRepository:      TaskRepo.NewTaskCenterRepository(db),
+		ExecutionCenterRepository: ExecutionRepo.NewExecutionCenterRepository(db),
 	}
 }

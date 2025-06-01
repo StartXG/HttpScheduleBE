@@ -1,12 +1,11 @@
 package api
 
 import (
-	apiTaskCenter "HttpScheduleBE/api/api_task_center"
-	apiExecutionCenter "HttpScheduleBE/api/api_execution_center"
-	domainTaskCenter "HttpScheduleBE/domain/domain_task_center"
-	domainExecutionCenter "HttpScheduleBE/domain/domain_execution_center"
+	ExecutionHandler "HttpScheduleBE/services/execution/handler"
+	ExecutionService "HttpScheduleBE/services/execution/service"
+	TaskHandler "HttpScheduleBE/services/task/handler"
+	TaskService "HttpScheduleBE/services/task/service"
 	"HttpScheduleBE/utils/database"
-
 	"github.com/gin-gonic/gin"
 )
 
@@ -16,8 +15,8 @@ func RegisterRoutes(r *gin.Engine, dbs database.Databases) {
 }
 
 func registryTaskCenterHandler(r *gin.Engine, dbs database.Databases) {
-	taskCenterService := domainTaskCenter.NewTaskCenterService(*dbs.TaskCenterRepository)
-	taskCenterController := apiTaskCenter.NewTaskCenterController(taskCenterService, database.AppConfig)
+	taskCenterService := TaskService.NewTaskCenterService(*dbs.TaskCenterRepository)
+	taskCenterController := TaskHandler.NewTaskCenterController(taskCenterService, database.AppConfig)
 	taskCenterGroup := r.Group("/task")
 	taskCenterGroup.POST("/", taskCenterController.CreateTask)
 	taskCenterGroup.PUT("/:id", taskCenterController.UpdateTask)
@@ -26,10 +25,11 @@ func registryTaskCenterHandler(r *gin.Engine, dbs database.Databases) {
 }
 
 func registryExecutionCenterHandler(r *gin.Engine, dbs database.Databases) {
-	executionCenterService := domainExecutionCenter.NewExecutionCenterService(*dbs.ExecutionCenterRepository)
-	executionCenterController := apiExecutionCenter.NewExecutionCenterController(executionCenterService, database.AppConfig)
+	executionCenterService := ExecutionService.NewExecutionCenterService(*dbs.ExecutionCenterRepository)
+	executionCenterController := ExecutionHandler.NewExecutionCenterController(executionCenterService, database.AppConfig)
 	executionCenterGroup := r.Group("/execution")
 	executionCenterGroup.GET("/", executionCenterController.GetAllExecution)
+	executionCenterGroup.GET("/running", executionCenterController.GetExecutingTask)
 	// executionCenterGroup.POST("/start/:id", executionCenterController.StartExecution)
 	// executionCenterGroup.POST("/stop/:id", executionCenterController.StopExecution)
 	// executionCenterGroup.GET("/status/:id", executionCenterController.GetExecutionStatus)

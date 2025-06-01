@@ -1,9 +1,10 @@
 package executor
 
 import (
-	domainExecutionCenter "HttpScheduleBE/domain/domain_execution_center"
-	domaintaskcenter "HttpScheduleBE/domain/domain_task_center"
-	"HttpScheduleBE/domain/entity"
+	"HttpScheduleBE/entity"
+	ExecutionRepo "HttpScheduleBE/services/execution/repo"
+	"HttpScheduleBE/services/execution/types"
+	TaskRepo "HttpScheduleBE/services/task/repo"
 	"encoding/json"
 	"strconv"
 	"time"
@@ -19,17 +20,18 @@ import (
 
 var (
 	executionList = make(map[cron.EntryID]*TaskExecution) // 使用 map 存储任务
-	executionLock sync.Mutex                             // 用于并发安全
-	c        = cron.New()                           // 初始化 cron 实例
+	executionLock sync.Mutex                              // 用于并发安全
+	c             = cron.New()                            // 初始化 cron 实例
 )
 
 type TaskExecution struct {
 	ID       cron.EntryID
+	TaskID   uint
 	Name     string
 	Schedule string
 	Job      func()
+	Status   string
 }
-
 
 // AddTask 添加任务
 func AddTask(execution *TaskExecution) (string, error) {
@@ -42,6 +44,7 @@ func AddTask(execution *TaskExecution) (string, error) {
 	}
 	execution.ID = executionId
 	executionList[executionId] = execution
+	execution.Status = "pending" // 初始化状态为 pending
 	return strconv.Itoa(int(executionId)), nil
 }
 
@@ -54,13 +57,13 @@ func DeleteTask(executionId cron.EntryID) {
 	delete(executionList, executionId)
 }
 
-// 更新任务
-func UpdateTask(executionId cron.EntryID, newTask *TaskExecution) (string,error) {
+// UpdateTask 更新任务
+func UpdateTask(executionId cron.EntryID, newTask *TaskExecution) (string, error) {
 	DeleteTask(executionId) // 删除旧任务
 	return AddTask(newTask)
 }
 
-// 获取任务
+// GetTask 获取任务
 func GetTask(executionId cron.EntryID) (*TaskExecution, bool) {
 	executionLock.Lock()
 	defer executionLock.Unlock()
@@ -69,33 +72,49 @@ func GetTask(executionId cron.EntryID) (*TaskExecution, bool) {
 	return execution, exists
 }
 
-// 获取所有任务
+// GetAllTasks 获取所有任务
 func GetAllTasks() []*TaskExecution {
 	executionLock.Lock()
 	defer executionLock.Unlock()
 
 	executions := make([]*TaskExecution, 0, len(executionList))
 	for _, execution := range executionList {
+		fmt.Println("Task Name:", execution)
 		executions = append(executions, execution)
 	}
 	return executions
 }
 
-// 启动调度器
+func GetAllExecutingTasks() []*types.ResponseExecutingTask {
+	executionLock.Lock()
+	defer executionLock.Unlock()
+
+	var executingTasks []*types.ResponseExecutingTask
+	for _, execution := range executionList {
+		executingTasks = append(executingTasks, &types.ResponseExecutingTask{
+			TaskID: execution.TaskID,
+			Status: execution.Status,
+			Name:   execution.Name,
+		})
+	}
+	return executingTasks
+}
+
+// StartScheduler 启动调度器
 func StartScheduler() {
 	fmt.Println("Starting scheduler...")
 	c.Start()
 	fmt.Println("Scheduler started.")
 }
 
-// 停止调度器
+// StopScheduler 停止调度器
 func StopScheduler() {
 	fmt.Println("Stopping scheduler...")
 	c.Stop()
 	fmt.Println("Scheduler stopped.")
 }
 
-func StartExecutionAutomation(isAuto bool, taskRepo *domaintaskcenter.Repository, execRepo *domainExecutionCenter.Repository) {
+func StartExecutionAutomation(isAuto bool, taskRepo *TaskRepo.Repository, execRepo *ExecutionRepo.Repository) {
 	if isAuto {
 		taskRepos, err := taskRepo.GetAllTasks()
 		if err != nil {
@@ -111,15 +130,20 @@ func StartExecutionAutomation(isAuto bool, taskRepo *domaintaskcenter.Repository
 			te := &TaskExecution{
 				Name:     task.TaskName,
 				Schedule: task.TaskCron,
+				TaskID:   task.ID,
 				Job: func() {
 					// 这里可以调用实际的 HTTP 请求逻辑
 					// 例如使用 http_task 包中的方法
 					headers := make(map[string]string)
-					json.Unmarshal([]byte(task.TaskHeader), &headers)
+					err := json.Unmarshal([]byte(task.TaskHeader), &headers)
+					if err != nil {
+						return
+					}
 					executeHttpTask(
-						task.TaskUrl, 
-						task.TaskMethod, 
-						headers, 
+						task.ID,
+						task.TaskUrl,
+						task.TaskMethod,
+						headers,
 						task.TaskBody,
 						execRepo,
 					)
@@ -135,18 +159,19 @@ func StartExecutionAutomation(isAuto bool, taskRepo *domaintaskcenter.Repository
 			}
 		}
 
-		StartScheduler()	
+		StartScheduler()
 	} else {
 		fmt.Println("Automation is disabled.")
 	}
 }
 
 func executeHttpTask(
-	url string, 
-	method string, 
-	header map[string]string, 
+	taskID uint,
+	url string,
+	method string,
+	header map[string]string,
 	body string,
-	execRepo *domainExecutionCenter.Repository,
+	execRepo *ExecutionRepo.Repository,
 ) {
 	var ErrLog string
 	startTime := time.Now().Format("2006-01-02 15:04:05")
@@ -167,7 +192,12 @@ func executeHttpTask(
 	statusCode := 0
 	var responseBody []byte
 	if err == nil {
-		defer res.Body.Close()
+		defer func(Body io.ReadCloser) {
+			err := Body.Close()
+			if err != nil {
+				fmt.Println("Error closing response body:", err)
+			}
+		}(res.Body)
 		statusCode = res.StatusCode
 		if statusCode != 200 {
 			ErrLog = fmt.Sprintf("Error: %s", res.Status)
@@ -188,13 +218,13 @@ func executeHttpTask(
 		ErrLog = fmt.Sprintf("Error: %s", err.Error())
 	}
 	execRecord := &entity.ExecutionCenter{
-		TaskID:   0, // 这里需要设置为实际的任务ID
-		Status:   strconv.Itoa(statusCode),
+		TaskID:    taskID,
+		Status:    strconv.Itoa(statusCode),
 		StartTime: startTime,
 		EndTime:   endTime,
-		ErrorLog: ErrLog,
+		ErrorLog:  ErrLog,
 	}
-	
+
 	if execRepo != nil {
 		if saveErr := execRepo.CreateExecution(execRecord); saveErr != nil {
 			fmt.Println("Failed to save execution record:", saveErr)

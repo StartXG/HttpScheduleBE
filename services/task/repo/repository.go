@@ -1,7 +1,7 @@
-package domaintaskcenter
+package repo
 
 import (
-	"HttpScheduleBE/domain/entity"
+	"HttpScheduleBE/entity"
 	"fmt"
 
 	"gorm.io/gorm"

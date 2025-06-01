@@ -1,9 +1,9 @@
 package commands
 
 import (
-	"HttpScheduleBE/domain/executor"
 	"HttpScheduleBE/api"
 	"HttpScheduleBE/config"
+	"HttpScheduleBE/services/executor"
 	"HttpScheduleBE/utils/database"
 	"fmt"
 	"time"

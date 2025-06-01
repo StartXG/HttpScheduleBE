@@ -1,34 +1,46 @@
-package domaintaskcenter
+package service
 
 import (
-	httpTypes "HttpScheduleBE/api/types"
-	"HttpScheduleBE/domain/entity"
+	"HttpScheduleBE/entity"
+	"HttpScheduleBE/services/task/repo"
+	httpTypes "HttpScheduleBE/services/task/types"
 	"fmt"
 )
 
-type Service struct {
-	r Repository
+type TaskCenter interface {
+	CreateTask(req *httpTypes.RequestTaskCenter) error
+	UpdateTask(taskId string, req *httpTypes.RequestTaskCenter) error
+	DeleteTask(id string) error
+	GetAllTasks() ([]httpTypes.ResponseTaskCenter, error)
 }
 
-func NewTaskCenterService(r Repository) *Service {
-	r.Migration()
+type Service struct {
+	r repo.Repository
+}
+
+func NewTaskCenterService(r repo.Repository) *Service {
+	if err := r.Migration(); err != nil {
+		panic("Failed to migrate TaskCenter repository: " + err.Error())
+	}
 	return &Service{
 		r: r,
 	}
 }
 
 func (s *Service) CreateTask(req *httpTypes.RequestTaskCenter) error {
-	task := &entity.TaskCenter{
-		TaskName:   req.TaskName,
-		TaskUrl:    req.TaskUrl,
-		TaskMethod: req.TaskMethod,
-		TaskHeader: req.TaskHeader,
-		TaskBody:   req.TaskBody,
-		TaskCron:   req.TaskCron,
-		TaskRemark: req.TaskRemark,
+	if err := s.r.CreateTask(&entity.TaskCenter{
+		TaskName:      req.TaskName,
+		TaskUrl:       req.TaskUrl,
+		TaskMethod:    req.TaskMethod,
+		TaskHeader:    req.TaskHeader,
+		TaskBody:      req.TaskBody,
+		TaskCron:      req.TaskCron,
+		TaskRemark:    req.TaskRemark,
 		IsTaskEnabled: req.IsTaskEnabled,
+	}); err != nil {
+		return fmt.Errorf("failed to create task: %w", err)
 	}
-	return s.r.CreateTask(task)
+	return nil
 }
 
 func (s *Service) UpdateTask(taskId string, req *httpTypes.RequestTaskCenter) error {
@@ -36,6 +48,7 @@ func (s *Service) UpdateTask(taskId string, req *httpTypes.RequestTaskCenter) er
 	if err != nil {
 		return fmt.Errorf("task not found: %w", err)
 	}
+	fmt.Println(task)
 	task.TaskName = req.TaskName
 	task.TaskUrl = req.TaskUrl
 	task.TaskMethod = req.TaskMethod
@@ -44,6 +57,7 @@ func (s *Service) UpdateTask(taskId string, req *httpTypes.RequestTaskCenter) er
 	task.TaskCron = req.TaskCron
 	task.TaskRemark = req.TaskRemark
 	task.IsTaskEnabled = req.IsTaskEnabled
+	fmt.Println(task)
 
 	return s.r.UpdateTask(task)
 }
@@ -65,6 +79,7 @@ func (s *Service) GetAllTasks() ([]httpTypes.ResponseTaskCenter, error) {
 	var responseTasks []httpTypes.ResponseTaskCenter
 	for _, task := range tasks {
 		responseTasks = append(responseTasks, httpTypes.ResponseTaskCenter{
+			TaskId:        task.ID,
 			TaskName:      task.TaskName,
 			TaskUrl:       task.TaskUrl,
 			TaskMethod:    task.TaskMethod,

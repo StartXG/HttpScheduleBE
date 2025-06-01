@@ -125,26 +125,31 @@ func StartExecutionAutomation(isAuto bool, taskRepo *TaskRepo.Repository, execRe
 			if !task.IsTaskEnabled {
 				continue
 			}
-			fmt.Println("Task Name:", task)
+			t := task
+			fmt.Println("Task detail:", t)
 			// 创建一个新的 TaskExecution 实例
 			te := &TaskExecution{
-				Name:     task.TaskName,
-				Schedule: task.TaskCron,
-				TaskID:   task.ID,
+				Name:     t.TaskName,
+				Schedule: t.TaskCron,
+				TaskID:   t.ID,
 				Job: func() {
 					// 这里可以调用实际的 HTTP 请求逻辑
+					fmt.Println(">>> Executing Task:", t.TaskName)
 					// 例如使用 http_task 包中的方法
 					headers := make(map[string]string)
-					err := json.Unmarshal([]byte(task.TaskHeader), &headers)
-					if err != nil {
-						return
-					}
+					if t.TaskHeader != "" && t.TaskHeader != "{}" && t.TaskHeader != "null" {
+						err := json.Unmarshal([]byte(t.TaskHeader), &headers)
+						if err != nil {
+							fmt.Println("Failed to unmarshal task headers:", err)
+							return
+						}
+					}					
 					executeHttpTask(
-						task.ID,
-						task.TaskUrl,
-						task.TaskMethod,
+						t.ID,
+						t.TaskUrl,
+						t.TaskMethod,
 						headers,
-						task.TaskBody,
+						t.TaskBody,
 						execRepo,
 					)
 				},
@@ -176,6 +181,7 @@ func executeHttpTask(
 	var ErrLog string
 	startTime := time.Now().Format("2006-01-02 15:04:05")
 	client := &http.Client{}
+	fmt.Println("Executing HTTP task:", url, method, header, body)
 	req, err := http.NewRequest(method, url, strings.NewReader(body))
 	if err != nil {
 		fmt.Println(err)

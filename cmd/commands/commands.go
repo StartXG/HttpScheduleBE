@@ -3,7 +3,7 @@ package commands
 import (
 	"HttpScheduleBE/api"
 	"HttpScheduleBE/config"
-	"HttpScheduleBE/services/executor"
+	"HttpScheduleBE/utils/executor"
 	"HttpScheduleBE/utils/database"
 	"fmt"
 	"time"

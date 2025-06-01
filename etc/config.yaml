@@ -1,0 +1,6 @@
+db_host: 127.0.0.1
+db_port: 3306
+db_name: hs_dev
+db_user: root
+db_password: 123456
+execute_automatic: true

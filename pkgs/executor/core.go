@@ -1,7 +1,7 @@
 package executor
 
 import (
-	"HttpScheduleBE/entity"
+	httpinvoke "HttpScheduleBE/pkgs/http-invoke"
 	ExecutionRepo "HttpScheduleBE/services/execution/repo"
 	"HttpScheduleBE/services/execution/types"
 	TaskRepo "HttpScheduleBE/services/task/repo"
@@ -10,8 +10,6 @@ import (
 	"time"
 
 	"fmt"
-	"io"
-	"net/http"
 	"strings"
 	"sync"
 
@@ -31,6 +29,14 @@ type TaskExecution struct {
 	Schedule string
 	Job      func()
 	Status   string
+}
+
+type ExecuteResultForRecord struct {
+	TaskID    uint      `json:"task_id"`
+	Result    string    `json:"result"`
+	StartTime time.Time `json:"start_time"`
+	EndTime   time.Time `json:"end_time"`
+	ErrMsg   string    `json:"error_msg,omitempty"`
 }
 
 // AddTask 添加任务
@@ -101,20 +107,25 @@ func GetAllExecutingTasks() []*types.ResponseExecutingTask {
 }
 
 // StartScheduler 启动调度器
-func StartScheduler() {
+func startScheduler() {
 	fmt.Println("Starting scheduler...")
 	c.Start()
 	fmt.Println("Scheduler started.")
 }
 
 // StopScheduler 停止调度器
-func StopScheduler() {
-	fmt.Println("Stopping scheduler...")
-	c.Stop()
-	fmt.Println("Scheduler stopped.")
-}
+// func stopScheduler() {
+// 	fmt.Println("Stopping scheduler...")
+// 	c.Stop()
+// 	fmt.Println("Scheduler stopped.")
+// }
 
-func StartExecutionAutomation(isAuto bool, taskRepo *TaskRepo.Repository, execRepo *ExecutionRepo.Repository) {
+func StartExecutionAutomation(
+	isAuto bool, 
+	taskRepo *TaskRepo.Repository, 
+	execRepo *ExecutionRepo.Repository,
+	executeResult chan<- ExecuteResultForRecord,
+) {
 	if isAuto {
 		taskRepos, err := taskRepo.GetAllTasks()
 		if err != nil {
@@ -133,9 +144,7 @@ func StartExecutionAutomation(isAuto bool, taskRepo *TaskRepo.Repository, execRe
 				Schedule: t.TaskCron,
 				TaskID:   t.ID,
 				Job: func() {
-					// 这里可以调用实际的 HTTP 请求逻辑
-					fmt.Println(">>> Executing Task:", t.TaskName)
-					// 例如使用 http_task 包中的方法
+					StartTime := time.Now()
 					headers := make(map[string]string)
 					if t.TaskHeader != "" && t.TaskHeader != "{}" && t.TaskHeader != "null" {
 						err := json.Unmarshal([]byte(t.TaskHeader), &headers)
@@ -143,15 +152,31 @@ func StartExecutionAutomation(isAuto bool, taskRepo *TaskRepo.Repository, execRe
 							fmt.Println("Failed to unmarshal task headers:", err)
 							return
 						}
-					}					
-					executeHttpTask(
-						t.ID,
-						t.TaskUrl,
-						t.TaskMethod,
-						headers,
-						t.TaskBody,
-						execRepo,
-					)
+					}
+					httpinvoke := &httpinvoke.HttpInvoke{
+						URL:     t.TaskUrl,
+						Method:  t.TaskMethod,
+						Headers: headers,
+						Body:    strings.NewReader(t.TaskBody),
+					}
+					if response, err := httpinvoke.Invoke(); err != nil {
+						executeResult <- ExecuteResultForRecord{
+							TaskID:  t.ID,
+							Result:  string(response),
+							ErrMsg:  err.Error(),
+							StartTime: StartTime,
+							EndTime:   time.Now(),
+						}
+					}else{
+						// 任务执行成功
+						executeResult <- ExecuteResultForRecord{
+							TaskID:    t.ID,
+							Result:    string(response),
+							StartTime: StartTime,
+							EndTime:   time.Now(),
+						}	
+					}
+					
 				},
 			}
 			// 添加任务到调度器
@@ -164,78 +189,8 @@ func StartExecutionAutomation(isAuto bool, taskRepo *TaskRepo.Repository, execRe
 			}
 		}
 
-		StartScheduler()
+		startScheduler()
 	} else {
 		fmt.Println("Automation is disabled.")
 	}
-}
-
-func executeHttpTask(
-	taskID uint,
-	url string,
-	method string,
-	header map[string]string,
-	body string,
-	execRepo *ExecutionRepo.Repository,
-) {
-	var ErrLog string
-	startTime := time.Now().Format("2006-01-02 15:04:05")
-	client := &http.Client{}
-	fmt.Println("Executing HTTP task:", url, method, header, body)
-	req, err := http.NewRequest(method, url, strings.NewReader(body))
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	for key, value := range header {
-		req.Header.Add(key, value)
-	}
-	if value, ok := header["Content-Type"]; !ok || value != "application/json" {
-		req.Header.Add("Content-Type", "application/json")
-	}
-
-	res, err := client.Do(req)
-	statusCode := 0
-	var responseBody []byte
-	if err == nil {
-		defer func(Body io.ReadCloser) {
-			err := Body.Close()
-			if err != nil {
-				fmt.Println("Error closing response body:", err)
-			}
-		}(res.Body)
-		statusCode = res.StatusCode
-		if statusCode != 200 {
-			ErrLog = fmt.Sprintf("Error: %s", res.Status)
-		} else {
-			ErrLog = ""
-		}
-		responseBody, err = io.ReadAll(res.Body)
-		if err != nil {
-			fmt.Println(err)
-		}
-	} else {
-		fmt.Println(err)
-	}
-	endTime := time.Now().Format("2006-01-02 15:04:05")
-
-	// 记录到表中
-	if err != nil {
-		ErrLog = fmt.Sprintf("Error: %s", err.Error())
-	}
-	execRecord := &entity.ExecutionCenter{
-		TaskID:    taskID,
-		Status:    strconv.Itoa(statusCode),
-		StartTime: startTime,
-		EndTime:   endTime,
-		ErrorLog:  ErrLog,
-	}
-
-	if execRepo != nil {
-		if saveErr := execRepo.CreateExecution(execRecord); saveErr != nil {
-			fmt.Println("Failed to save execution record:", saveErr)
-		}
-	}
-
-	fmt.Println(string(responseBody))
 }

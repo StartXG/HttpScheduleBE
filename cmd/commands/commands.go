@@ -1,9 +1,10 @@
 package commands
 
 import (
+	internal "HttpScheduleBE/Internal"
 	"HttpScheduleBE/api"
 	"HttpScheduleBE/config"
-	"HttpScheduleBE/utils/executor"
+	"HttpScheduleBE/pkgs/executor"
 	"HttpScheduleBE/utils/database"
 	"fmt"
 	"time"
@@ -36,11 +37,14 @@ func HttpScheduleBeCmd() *cobra.Command {
 				MaxAge:           12 * time.Hour, // 预检请求的缓存时间
 			}))
 			api.RegisterRoutes(r, dbs)
+			executeResult := make(chan executor.ExecuteResultForRecord, 3)
 			executor.StartExecutionAutomation(
 				cfg.ExecuteAutomatic,
 				dbs.TaskCenterRepository,
 				dbs.ExecutionCenterRepository,
+				executeResult,
 			)
+			go internal.LogRecord(executeResult, dbs.ExecutionCenterRepository)
 			if err := r.Run(":8080"); err != nil {
 				fmt.Printf("Failed to start server: %v\n", err)
 			}

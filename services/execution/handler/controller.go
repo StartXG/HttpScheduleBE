@@ -4,7 +4,7 @@ import (
 	"HttpScheduleBE/api/helper"
 	"HttpScheduleBE/config"
 	"HttpScheduleBE/services/execution/service"
-	"HttpScheduleBE/utils/executor"
+	"HttpScheduleBE/pkgs/executor"
 
 	"github.com/gin-gonic/gin"
 )
